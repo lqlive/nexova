@@ -1,0 +1,413 @@
+@api = http://localhost:5000
+@engine = http://localhost:7071
+@dataSourceId = replace-with-created-data-source-id
+
+### Vistora API health
+GET {{api}}/health
+
+### Vistora Engine health
+GET {{engine}}/health
+
+### Create PostgreSQL data source
+POST {{api}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local PostgreSQL",
+  "type": "postgres",
+  "connection": {
+    "host": "localhost",
+    "port": "5432",
+    "database": "demo",
+    "username": "postgres",
+    "password": "password"
+  }
+}
+
+### Create MySQL data source
+POST {{api}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local MySQL",
+  "type": "mysql",
+  "connection": {
+    "host": "localhost",
+    "port": "3306",
+    "database": "demo",
+    "username": "root",
+    "password": "password"
+  }
+}
+
+### Create ClickHouse data source
+POST {{api}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local ClickHouse",
+  "type": "clickhouse",
+  "connection": {
+    "host": "localhost",
+    "port": "8123",
+    "database": "default",
+    "username": "default",
+    "password": ""
+  }
+}
+
+### Create MongoDB data source
+POST {{api}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local MongoDB",
+  "type": "mongodb",
+  "connection": {
+    "connectionString": "mongodb://root:password@localhost:27017/mongo_db?authSource=admin&tls=false",
+    "host": "localhost",
+    "port": "27017",
+    "database": "mongo_db",
+    "username": "root",
+    "password": "password"
+  }
+}
+
+### List data sources
+GET {{api}}/api/data-sources
+
+### Test data source connection
+POST {{api}}/api/data-sources/test
+Content-Type: application/json
+
+{
+  "dataSourceId": "{{dataSourceId}}"
+}
+
+### List tables
+POST {{api}}/api/schema/tables
+Content-Type: application/json
+
+{
+  "dataSourceId": "{{dataSourceId}}"
+}
+
+### List columns
+POST {{api}}/api/schema/columns
+Content-Type: application/json
+
+{
+  "dataSourceId": "{{dataSourceId}}",
+  "schema": "public",
+  "table": "users"
+}
+
+### Execute SQL
+POST {{api}}/api/query
+Content-Type: application/json
+
+{
+  "dataSourceId": "{{dataSourceId}}",
+  "sql": "select * from users",
+  "limit": 100,
+  "timeoutMs": 30000
+}
+
+### List query history
+GET {{api}}/api/query-history
+
+### Create saved query
+POST {{api}}/api/saved-queries
+Content-Type: application/json
+
+{
+  "name": "Users Preview",
+  "dataSourceId": "{{dataSourceId}}",
+  "sql": "select * from users"
+}
+
+### Create dataset
+POST {{api}}/api/datasets
+Content-Type: application/json
+
+{
+  "name": "Users Dataset",
+  "dataSourceId": "{{dataSourceId}}",
+  "sql": "select * from users"
+}
+
+### Create chart
+POST {{api}}/api/charts
+Content-Type: application/json
+
+{
+  "name": "Users Table",
+  "datasetId": "replace-with-dataset-id",
+  "visualizationType": "table",
+  "config": {
+    "columns": ["id", "name"]
+  }
+}
+
+### Create dashboard
+POST {{api}}/api/dashboards
+Content-Type: application/json
+
+{
+  "name": "Main Dashboard",
+  "charts": [
+    {
+      "chartId": "replace-with-chart-id",
+      "x": 0,
+      "y": 0,
+      "width": 6,
+      "height": 4
+    }
+  ]
+}
+
+###############################################################################
+# File data sources (queried directly against the Rust engine via DataFusion) #
+# A single file defaults to a table name based on its file name.              #
+# A directory with type "files" exposes each supported file as a table.       #
+###############################################################################
+
+### CSV: list columns
+POST {{engine}}/schema/columns
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "csv",
+    "path": "C:/data/sales.csv",
+    "hasHeader": true,
+    "delimiter": ","
+  },
+  "table": "sales"
+}
+
+### CSV: query
+POST {{engine}}/query
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "csv",
+    "path": "C:/data/sales.csv",
+    "hasHeader": true
+  },
+  "sql": "select region, sum(amount) as total from sales group by region order by total desc",
+  "limit": 100
+}
+
+### JSON (newline-delimited / JSON Lines): query
+POST {{engine}}/query
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "json",
+    "path": "C:/data/events.ndjson"
+  },
+  "sql": "select * from events",
+  "limit": 100
+}
+
+### Excel (.xlsx): query a specific sheet
+POST {{engine}}/query
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "excel",
+    "path": "C:/data/report.xlsx",
+    "sheet": "Sheet1",
+    "hasHeader": true,
+    "table": "report"
+  },
+  "sql": "select * from report",
+  "limit": 100
+}
+
+### Parquet: query
+POST {{engine}}/query
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "parquet",
+    "path": "C:/data/sales.parquet"
+  },
+  "sql": "select * from sales",
+  "limit": 100
+}
+
+### Mixed file directory: list tables
+POST {{engine}}/schema/tables
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "files",
+    "path": "C:/data"
+  }
+}
+
+### Mixed file directory: query one discovered table
+POST {{engine}}/query
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "files",
+    "path": "C:/data"
+  },
+  "sql": "select * from sales",
+  "limit": 100
+}
+
+### MongoDB: query collection
+POST {{engine}}/query
+Content-Type: application/json
+
+{
+  "dataSource": {
+    "type": "mongodb",
+    "connectionString": "mongodb://root:password@localhost:27017/mongo_db?authSource=admin&tls=false",
+    "host": "localhost",
+    "port": 27017,
+    "database": "mongo_db",
+    "username": "root",
+    "password": "password"
+  },
+  "sql": "select * from companies",
+  "limit": 100
+}
+
+### Federated query: join CSV and Parquet
+POST {{engine}}/query/federated
+Content-Type: application/json
+
+{
+  "dataSources": [
+    {
+      "type": "csv",
+      "path": "C:/data/sales.csv"
+    },
+    {
+      "type": "parquet",
+      "path": "C:/data/customers.parquet"
+    }
+  ],
+  "sql": "select s.region, c.segment, sum(s.amount) as total from sales s join customers c on s.customer_id = c.id group by s.region, c.segment",
+  "limit": 100
+}
+
+### Federated query: join CSV and PostgreSQL
+POST {{engine}}/query/federated
+Content-Type: application/json
+
+{
+  "dataSources": [
+    {
+      "type": "csv",
+      "path": "C:/data/orders.csv"
+    },
+    {
+      "type": "postgres",
+      "host": "localhost",
+      "port": 5432,
+      "database": "demo",
+      "username": "postgres",
+      "password": "password",
+      "schema": "public",
+      "table": "customers",
+      "alias": "pg_customers"
+    }
+  ],
+  "sql": "select c.segment, sum(o.amount) as total from orders o join pg_customers c on o.customer_id = c.id group by c.segment",
+  "limit": 100
+}
+
+### Federated query: join PostgreSQL and MySQL
+POST {{engine}}/query/federated
+Content-Type: application/json
+
+{
+  "dataSources": [
+    {
+      "type": "postgres",
+      "host": "localhost",
+      "port": 5432,
+      "database": "demo",
+      "username": "postgres",
+      "password": "password",
+      "schema": "public",
+      "table": "customers",
+      "alias": "pg_customers"
+    },
+    {
+      "type": "mysql",
+      "host": "localhost",
+      "port": 3306,
+      "database": "demo",
+      "username": "root",
+      "password": "password",
+      "table": "orders",
+      "alias": "mysql_orders"
+    }
+  ],
+  "sql": "select c.segment, sum(o.amount) as total from pg_customers c join mysql_orders o on c.id = o.customer_id group by c.segment",
+  "limit": 100
+}
+
+### Federated query: join CSV and ClickHouse
+POST {{engine}}/query/federated
+Content-Type: application/json
+
+{
+  "dataSources": [
+    {
+      "type": "csv",
+      "path": "C:/data/orders.csv"
+    },
+    {
+      "type": "clickhouse",
+      "host": "localhost",
+      "port": 8123,
+      "database": "default",
+      "username": "default",
+      "password": "",
+      "table": "customers",
+      "alias": "ch_customers"
+    }
+  ],
+  "sql": "select c.segment, sum(o.amount) as total from orders o join ch_customers c on o.customer_id = c.id group by c.segment",
+  "limit": 100
+}
+
+### Federated query: join CSV and MongoDB
+POST {{engine}}/query/federated
+Content-Type: application/json
+
+{
+  "dataSources": [
+    {
+      "type": "csv",
+      "path": "C:/data/orders.csv"
+    },
+    {
+      "type": "mongodb",
+      "connectionString": "mongodb://root:password@localhost:27017/mongo_db?authSource=admin&tls=false",
+      "host": "localhost",
+      "port": 27017,
+      "database": "mongo_db",
+      "username": "root",
+      "password": "password",
+      "table": "companies",
+      "alias": "mongo_companies"
+    }
+  ],
+  "sql": "select * from orders o join mongo_companies c on o.company_id = c.id",
+  "limit": 100
+}
