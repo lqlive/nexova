@@ -12,5 +12,5 @@ public class DatasetDataSource
 
     public string? Alias { get; set; }
 
-    public int SortOrder { get; set; }
+    public int Order { get; set; }
 }

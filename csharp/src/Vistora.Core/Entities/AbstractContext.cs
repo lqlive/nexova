@@ -153,7 +153,7 @@ public abstract class AbstractContext<TContext> : DbContext, IContext
 
         datasetDataSource.Property(value => value.Alias).HasMaxLength(MaxAliasLength);
 
-        datasetDataSource.HasIndex(value => new { value.DatasetId, value.SortOrder });
+        datasetDataSource.HasIndex(value => new { value.DatasetId, value.Order });
     }
 
     private static void BuildDatasetColumnEntity(EntityTypeBuilder<DatasetColumn> column)
