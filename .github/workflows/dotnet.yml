@@ -1,0 +1,37 @@
+name: .NET
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "csharp/**"
+      - ".github/workflows/dotnet.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "csharp/**"
+      - ".github/workflows/dotnet.yml"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: csharp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Vistora.slnx
+
+      - name: Build
+        run: dotnet build Vistora.slnx --configuration Release --no-restore
