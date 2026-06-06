@@ -149,21 +149,21 @@ they use a file or directory path:
 ```json
 {
   "type": "csv",
-  "path": "C:/data/sales.csv",
+  "path": "C:/assets/sales.csv",
   "hasHeader": true,
   "delimiter": ","
 }
 ```
 
 For a single file, the default table name comes from the file name, e.g.
-`C:/data/sales.csv` is registered as `sales`. You can override it with `table`.
+`C:/assets/sales.csv` is registered as `sales`. You can override it with `table`.
 
 For a directory, each supported file is registered as a table:
 
 ```json
 {
   "type": "files",
-  "path": "C:/data"
+  "path": "C:/assets"
 }
 ```
 
@@ -193,8 +193,8 @@ own database `TableProvider`.
 ```json
 {
   "dataSources": [
-    { "type": "csv", "path": "C:/data/sales.csv" },
-    { "type": "parquet", "path": "C:/data/customers.parquet" }
+    { "type": "csv", "path": "C:/assets/sales.csv" },
+    { "type": "parquet", "path": "C:/assets/customers.parquet" }
   ],
   "sql": "select * from sales join customers on sales.customer_id = customers.id",
   "limit": 100
@@ -210,7 +210,7 @@ or `database` field, and `table` refers to the collection name.
 ```json
 {
   "dataSources": [
-    { "type": "csv", "path": "C:/data/orders.csv" },
+    { "type": "csv", "path": "C:/assets/orders.csv" },
     {
       "type": "postgres",
       "host": "localhost",

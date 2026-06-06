@@ -179,7 +179,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "csv",
-    "path": "C:/data/sales.csv",
+    "path": "C:/assets/sales.csv",
     "hasHeader": true,
     "delimiter": ","
   },
@@ -193,7 +193,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "csv",
-    "path": "C:/data/sales.csv",
+    "path": "C:/assets/sales.csv",
     "hasHeader": true
   },
   "sql": "select region, sum(amount) as total from sales group by region order by total desc",
@@ -207,7 +207,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "json",
-    "path": "C:/data/events.ndjson"
+    "path": "C:/assets/events.ndjson"
   },
   "sql": "select * from events",
   "limit": 100
@@ -220,7 +220,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "excel",
-    "path": "C:/data/report.xlsx",
+    "path": "C:/assets/report.xlsx",
     "sheet": "Sheet1",
     "hasHeader": true,
     "table": "report"
@@ -236,7 +236,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "parquet",
-    "path": "C:/data/sales.parquet"
+    "path": "C:/assets/sales.parquet"
   },
   "sql": "select * from sales",
   "limit": 100
@@ -249,7 +249,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/data"
+    "path": "C:/assets"
   }
 }
 
@@ -260,7 +260,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/data"
+    "path": "C:/assets"
   },
   "sql": "select * from sales",
   "limit": 100
@@ -292,11 +292,11 @@ Content-Type: application/json
   "dataSources": [
     {
       "type": "csv",
-      "path": "C:/data/sales.csv"
+      "path": "C:/assets/sales.csv"
     },
     {
       "type": "parquet",
-      "path": "C:/data/customers.parquet"
+      "path": "C:/assets/customers.parquet"
     }
   ],
   "sql": "select s.region, c.segment, sum(s.amount) as total from sales s join customers c on s.customer_id = c.id group by s.region, c.segment",
@@ -311,7 +311,7 @@ Content-Type: application/json
   "dataSources": [
     {
       "type": "csv",
-      "path": "C:/data/orders.csv"
+      "path": "C:/assets/orders.csv"
     },
     {
       "type": "postgres",
@@ -369,7 +369,7 @@ Content-Type: application/json
   "dataSources": [
     {
       "type": "csv",
-      "path": "C:/data/orders.csv"
+      "path": "C:/assets/orders.csv"
     },
     {
       "type": "clickhouse",
@@ -394,7 +394,7 @@ Content-Type: application/json
   "dataSources": [
     {
       "type": "csv",
-      "path": "C:/data/orders.csv"
+      "path": "C:/assets/orders.csv"
     },
     {
       "type": "mongodb",

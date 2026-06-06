@@ -1,13 +1,13 @@
 @engine = http://localhost:7071
 
-### List CSV tables from data directory
+### List CSV tables from assets directory
 POST {{engine}}/schema/tables
 Content-Type: application/json
 
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/Users/neuron/source/vision/data"
+    "path": "C:/Users/neuron/source/vision/assets"
   }
 }
 
@@ -18,7 +18,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/Users/neuron/source/vision/data"
+    "path": "C:/Users/neuron/source/vision/assets"
   },
   "sql": "select * from orders limit 10",
   "limit": 100
@@ -31,7 +31,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/Users/neuron/source/vision/data"
+    "path": "C:/Users/neuron/source/vision/assets"
   },
   "sql": "select region, sum(amount) as total_amount, count(*) as order_count from orders where status = 'paid' group by region order by total_amount desc",
   "limit": 100
@@ -44,7 +44,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/Users/neuron/source/vision/data"
+    "path": "C:/Users/neuron/source/vision/assets"
   },
   "sql": "select c.customer_name, c.segment, o.region, sum(o.amount) as total_amount from orders o join customers c on o.customer_id = c.customer_id where o.status = 'paid' group by c.customer_name, c.segment, o.region order by total_amount desc",
   "limit": 100
@@ -57,7 +57,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/Users/neuron/source/vision/data"
+    "path": "C:/Users/neuron/source/vision/assets"
   },
   "sql": "select date_bin(interval '1 minute', cast(order_time as timestamp), timestamp '1970-01-01 00:00:00') as bucket, sum(amount) as total_amount, count(*) as event_count from orders_timeseries where status = 'paid' group by bucket order by bucket",
   "limit": 100
@@ -70,7 +70,7 @@ Content-Type: application/json
 {
   "dataSource": {
     "type": "files",
-    "path": "C:/Users/neuron/source/vision/data"
+    "path": "C:/Users/neuron/source/vision/assets"
   },
   "sql": "select date_bin(interval '1 hour', cast(order_time as timestamp), timestamp '1970-01-01 00:00:00') as bucket, sum(amount) as total_amount, count(*) as event_count from orders_timeseries where status = 'paid' group by bucket order by bucket",
   "limit": 100
