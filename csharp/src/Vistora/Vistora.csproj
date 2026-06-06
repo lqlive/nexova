@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Vistora.Core\Vistora.Core.csproj" />
+    <ProjectReference Include="..\Vistora.Database.PostgreSQL\Vistora.Database.PostgreSQL.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
