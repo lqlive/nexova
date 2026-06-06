@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Vistora.Core.Entities;
 using Vistora.Core.Store;
-using Vistora.Database.PostgreSQL.Stores;
+using Vistora.Database.PostgreSQL.Store;
 
 namespace Vistora.Database.PostgreSQL.Management;
 
