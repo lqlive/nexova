@@ -8,19 +8,33 @@ Vistora is a Superset-like BI prototype with a C# product/API layer and a Rust q
 - Rust `vistora-engine` service for PostgreSQL, MySQL, ClickHouse, MongoDB, and file (CSV/JSON/Excel/Parquet) connection tests, schema discovery, read-only SQL queries, and DataFusion federated queries.
 - In-memory metadata storage for the first iteration.
 
+## Repository Layout
+
+```text
+  assets/                         Sample CSV files, SQL examples, and request snippets.
+  csharp/
+    Vistora.slnx
+    src/
+      Vistora/                    ASP.NET Core API host.
+      Vistora.Core/               BI metadata entities and store abstractions.
+      Vistora.Database.PostgreSQL/ PostgreSQL EF Core context and store implementations.
+  rust/
+    vistora-engine/               Rust query engine and file/database connectors.
+```
+
 ## Run Locally
 
 Start the Rust query engine:
 
 ```powershell
-cd engine/vistora-engine
+cd rust/vistora-engine
 cargo run
 ```
 
 Rust engine layout:
 
 ```text
-engine/vistora-engine/
+rust/vistora-engine/
   Cargo.toml
   src/
     lib.rs
@@ -38,8 +52,13 @@ engine/vistora-engine/
         mod.rs
         registry.rs
       executor.rs
-      postgres.rs
-      mysql.rs
+      providers/
+        mod.rs
+        postgres.rs
+        mysql.rs
+        clickhouse.rs
+        mongodb.rs
+        sqlite.rs
       federated/
         mod.rs
         files.rs
@@ -63,20 +82,32 @@ engine/vistora-engine/
 Start the C# API:
 
 ```powershell
-dotnet run --project src/Vistora/Vistora.csproj
+dotnet run --project csharp/src/Vistora/Vistora.csproj
 ```
 
-The API expects the engine at `http://localhost:7071` by default. You can change this in `src/Vistora/appsettings.json`.
+The API expects the engine at `http://localhost:7071` by default. You can change this in `csharp/src/Vistora/appsettings.json`.
 
-Start the React UI:
+C# project layout:
 
-```powershell
-cd web
-npm install
-npm run dev
+```text
+csharp/
+  Vistora.slnx
+  src/
+    Vistora/
+      Program.cs
+      Apis/
+    Vistora.Core/
+      Entities/
+      Store/
+        IDataSourceStore.cs
+        IDatasetStore.cs
+        InMemoryDataSourceStore.cs
+        InMemoryDatasetStore.cs
+    Vistora.Database.PostgreSQL/
+      PostgreSQLContext.cs
+      Management/
+      Store/
 ```
-
-The React dev server runs at `http://localhost:5173` and proxies `/api` requests to `http://localhost:5101`.
 
 ## Data Source Connection Shape
 
