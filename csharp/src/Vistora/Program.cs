@@ -1,12 +1,9 @@
-using Vistora.Database.PostgreSQL.Management;
+using Vistora.Core.Store;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var postgreSQLConnectionString = builder.Configuration.GetConnectionString("PostgreSQL");
-if (!string.IsNullOrWhiteSpace(postgreSQLConnectionString))
-{
-    builder.Services.AddPostgreSQLDatabase(postgreSQLConnectionString);
-}
+builder.Services.AddSingleton<IDataSourceStore, InMemoryDataSourceStore>();
+builder.Services.AddSingleton<IDatasetStore, InMemoryDatasetStore>();
 
 var app = builder.Build();
 

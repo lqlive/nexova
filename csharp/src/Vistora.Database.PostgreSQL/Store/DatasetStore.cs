@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Vistora.Core.Entities;
 using Vistora.Core.Store;
 
-namespace Vistora.Database.PostgreSQL.Stores;
+namespace Vistora.Database.PostgreSQL.Store;
 
 public sealed class DatasetStore(IContext context) : IDatasetStore
 {
