@@ -40,7 +40,7 @@ export interface ChartItem {
 }
 
 export interface DatasetItem {
-  id: number;
+  id: string | number;
   name: string;
   type: 'physical' | 'virtual';
   database: string;
@@ -63,7 +63,7 @@ export interface DatasourcePreview {
 }
 
 export interface DataSourceItem {
-  id: number;
+  id: string | number;
   name: string;
   type: string;
   host: string;
@@ -71,4 +71,115 @@ export interface DataSourceItem {
   datasets: number;
   lastSync: string;
   tables: string[];
+}
+
+export interface DataSourceConfiguration {
+  connectionString?: string | null;
+  host?: string | null;
+  port?: number | null;
+  database?: string | null;
+  username?: string | null;
+  password?: string | null;
+  schema?: string | null;
+  path?: string | null;
+  storagePath?: string | null;
+  options?: Record<string, string | null>;
+}
+
+export interface DataSourceFileResponse {
+  id: string;
+  dataSourceId: string;
+  fileName: string;
+  storagePath: string;
+  path: string;
+  contentType: string;
+  size: number;
+  tableName: string;
+  fileType: string;
+  hasHeader?: boolean | null;
+  delimiter?: string | null;
+  sheet?: string | null;
+  createdAt: string;
+}
+
+export interface DataSourceResponse {
+  id: string;
+  name: string;
+  type: string;
+  configuration: DataSourceConfiguration;
+  files: DataSourceFileResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DataSourceRequest {
+  name: string;
+  type: string;
+  configuration: DataSourceConfiguration;
+}
+
+export interface FileUploadResponse {
+  fileName: string;
+  contentType: string;
+  size: number;
+  storagePath: string;
+  path: string;
+}
+
+export interface AddDataSourceFileRequest extends FileUploadResponse {
+  hasHeader?: boolean;
+  delimiter?: string;
+  sheet?: string;
+}
+
+export interface DatasetDataSourceResponse {
+  dataSourceId: string;
+  alias?: string | null;
+  order: number;
+}
+
+export interface DatasetColumnResponse {
+  id: string;
+  name: string;
+  type: string;
+  nullable: boolean;
+  precision?: number | null;
+  scale?: number | null;
+  ordinal: number;
+}
+
+export interface DatasetResponse {
+  id: string;
+  name: string;
+  sql: string;
+  description?: string | null;
+  dataSources: DatasetDataSourceResponse[];
+  columns: DatasetColumnResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EngineDataSourceConnection extends DataSourceConfiguration {
+  type: string;
+}
+
+export interface EngineTableInfo {
+  schema?: string | null;
+  name: string;
+  type: string;
+}
+
+export interface EngineColumnInfo {
+  name: string;
+  type: string;
+  nullable: boolean;
+  precision?: number | null;
+  scale?: number | null;
+}
+
+export interface EngineQueryResult {
+  columns: EngineColumnInfo[];
+  rows: unknown[][];
+  rowCount: number;
+  durationMs: number;
 }

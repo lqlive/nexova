@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -21,6 +21,8 @@ public abstract class AbstractContext<TContext> : DbContext, IContext
     public const int MaxDelimiterLength = 8;
     public const int MaxColumnNameLength = 256;
     public const int MaxColumnTypeLength = 128;
+    public const int MaxContentTypeLength = 256;
+    public const int MaxFileTypeLength = 32;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -63,6 +65,7 @@ public abstract class AbstractContext<TContext> : DbContext, IContext
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<DataSource>(BuildDataSourceEntity);
+        builder.Entity<DataSourceFile>(BuildDataSourceFileEntity);
         builder.Entity<Dataset>(BuildDatasetEntity);
         builder.Entity<DatasetDataSource>(BuildDatasetDataSourceEntity);
         builder.Entity<DatasetColumn>(BuildDatasetColumnEntity);
@@ -105,11 +108,7 @@ public abstract class AbstractContext<TContext> : DbContext, IContext
         configuration.Property(value => value.Password).HasMaxLength(DefaultMaxStringLength);
         configuration.Property(value => value.Schema).HasMaxLength(MaxSchemaLength);
         configuration.Property(value => value.Path).HasMaxLength(DefaultMaxStringLength);
-        configuration.Property(value => value.Table).HasMaxLength(MaxTableLength);
-        configuration.Property(value => value.Alias).HasMaxLength(MaxAliasLength);
-        configuration.Property(value => value.Delimiter).HasMaxLength(MaxDelimiterLength);
-        configuration.Property(value => value.Sheet).HasMaxLength(MaxNameLength);
-
+        configuration.Property(value => value.StoragePath).HasMaxLength(DefaultMaxStringLength);
         configuration.Property(value => value.Options)
             .HasMaxLength(DefaultMaxStringLength)
             .HasConversion(
@@ -117,6 +116,45 @@ public abstract class AbstractContext<TContext> : DbContext, IContext
                 value => DeserializeStringDictionary(value)
             )
             .Metadata.SetValueComparer(StringDictionaryComparer);
+    }
+
+    private static void BuildDataSourceFileEntity(EntityTypeBuilder<DataSourceFile> file)
+    {
+        file.HasKey(value => value.Id);
+        file.HasIndex(value => new { value.DataSourceId, value.FileName }).IsUnique();
+        file.HasIndex(value => new { value.DataSourceId, value.TableName }).IsUnique();
+
+        file.Property(value => value.FileName)
+            .HasMaxLength(MaxNameLength)
+            .IsRequired();
+
+        file.Property(value => value.StoragePath)
+            .HasMaxLength(DefaultMaxStringLength)
+            .IsRequired();
+
+        file.Property(value => value.Path)
+            .HasMaxLength(DefaultMaxStringLength)
+            .IsRequired();
+
+        file.Property(value => value.ContentType)
+            .HasMaxLength(MaxContentTypeLength)
+            .IsRequired();
+
+        file.Property(value => value.TableName)
+            .HasMaxLength(MaxTableLength)
+            .IsRequired();
+
+        file.Property(value => value.FileType)
+            .HasMaxLength(MaxFileTypeLength)
+            .IsRequired();
+
+        file.Property(value => value.Delimiter).HasMaxLength(MaxDelimiterLength);
+        file.Property(value => value.Sheet).HasMaxLength(MaxNameLength);
+
+        file.HasOne(value => value.DataSource)
+            .WithMany(value => value.Files)
+            .HasForeignKey(value => value.DataSourceId)
+            .IsRequired();
     }
 
     private static void BuildDatasetEntity(EntityTypeBuilder<Dataset> dataset)

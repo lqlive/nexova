@@ -10,10 +10,7 @@ namespace Vistora.Database.PostgreSQL.Management;
 
 public static class VistoraDatabaseBuilderExtensions
 {
-    public static IServiceCollection AddPostgreSQLDatabase(
-        this IServiceCollection services,
-        string connectionString
-    )
+    public static IServiceCollection AddPostgreSQLDatabase(this IServiceCollection services, string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 

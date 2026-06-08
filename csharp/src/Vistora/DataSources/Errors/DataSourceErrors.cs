@@ -27,4 +27,20 @@ public static class DataSourceErrors
     public static Error NameAlreadyExists => Error.Conflict(
         code: "DataSource.NameAlreadyExists",
         description: "A data source with the same name already exists");
+
+    public static Error FileRequired => Error.Validation(
+        code: "DataSource.FileRequired",
+        description: "A file is required");
+
+    public static Error FileEmpty => Error.Validation(
+        code: "DataSource.FileEmpty",
+        description: "The uploaded file is empty");
+
+    public static Error FileAlreadyExists => Error.Conflict(
+        code: "DataSource.FileAlreadyExists",
+        description: "A different file already exists at the generated storage path");
+
+    public static Error NotFileDataSource => Error.Validation(
+        code: "DataSource.NotFileDataSource",
+        description: "The data source is not a file data source");
 }

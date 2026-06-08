@@ -23,16 +23,19 @@ public sealed class DataSourceStore(IContext context) : IDataSourceStore
 
     public async Task<DataSource?> GetAsync(Guid id, CancellationToken cancellationToken)
         => await context.DataSources
+            .Include(source => source.Files)
             .Include(source => source.Datasets)
             .SingleOrDefaultAsync(source => source.Id == id, cancellationToken);
 
     public async Task<DataSource?> GetByNameAsync(string name, CancellationToken cancellationToken)
         => await context.DataSources
+            .Include(source => source.Files)
             .Include(source => source.Datasets)
             .SingleOrDefaultAsync(source => source.Name == name, cancellationToken);
 
     public async Task<IReadOnlyList<DataSource>> ListAsync(CancellationToken cancellationToken)
         => await context.DataSources
+            .Include(source => source.Files)
             .OrderBy(source => source.Name)
             .ToListAsync(cancellationToken);
 

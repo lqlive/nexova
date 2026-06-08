@@ -113,6 +113,47 @@ pub async fn execute_federated_query(
     })
 }
 
+/// Fingerprint of the files backing a source, used to invalidate cached
+/// contexts when files are added, removed, or modified in the source directory.
+pub fn path_signature(source: &DataSourceConnection) -> Result<String, EngineError> {
+    let root = PathBuf::from(source.require_path()?);
+    let metadata = fs::metadata(&root)
+        .map_err(|error| EngineError::FileSource(format!("read path metadata: {error}")))?;
+
+    let mut parts: Vec<String> = Vec::new();
+    if metadata.is_dir() {
+        let mut entries = fs::read_dir(&root)
+            .map_err(|error| EngineError::FileSource(format!("read directory: {error}")))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| EngineError::FileSource(format!("read directory entry: {error}")))?;
+        entries.sort_by_key(|entry| entry.path());
+
+        for entry in entries {
+            let path = entry.path();
+            if path.is_file() && kind_from_extension(&path).is_some() {
+                parts.push(file_fingerprint(&path));
+            }
+        }
+    } else if metadata.is_file() {
+        parts.push(file_fingerprint(&root));
+    }
+
+    Ok(parts.join("|"))
+}
+
+fn file_fingerprint(path: &Path) -> String {
+    let metadata = fs::metadata(path).ok();
+    let len = metadata.as_ref().map(|meta| meta.len()).unwrap_or_default();
+    let modified = metadata
+        .as_ref()
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+
+    format!("{}:{len}:{modified}", path.display())
+}
+
 /// Build a DataFusion context with the file registered under the logical table name.
 pub async fn build_context(source: &DataSourceConnection) -> Result<SessionContext, EngineError> {
     let ctx = SessionContext::new();

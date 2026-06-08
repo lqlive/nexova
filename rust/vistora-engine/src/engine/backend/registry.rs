@@ -24,7 +24,7 @@ pub struct BackendRegistry {
     clickhouse_pools: Arc<RwLock<HashMap<String, Arc<ClickHouseConnectionPool>>>>,
     mongodb_pools: Arc<RwLock<HashMap<String, Arc<MongoDBConnectionPool>>>>,
     sqlite_pools: Arc<RwLock<HashMap<String, Arc<SqliteConnectionPool>>>>,
-    file_contexts: Arc<RwLock<HashMap<String, Arc<SessionContext>>>>,
+    file_contexts: Arc<RwLock<HashMap<String, (String, Arc<SessionContext>)>>>,
 }
 
 impl BackendRegistry {
@@ -189,16 +189,19 @@ impl BackendRegistry {
         source: &DataSourceConnection,
     ) -> Result<Arc<SessionContext>, EngineError> {
         let cache_key = file_cache_key(source)?;
+        let signature = files::path_signature(source)?;
 
-        if let Some(ctx) = self.file_contexts.read().await.get(&cache_key) {
-            return Ok(ctx.clone());
+        if let Some((cached_signature, ctx)) = self.file_contexts.read().await.get(&cache_key) {
+            if *cached_signature == signature {
+                return Ok(ctx.clone());
+            }
         }
 
         let ctx = Arc::new(files::build_context(source).await?);
         self.file_contexts
             .write()
             .await
-            .insert(cache_key, ctx.clone());
+            .insert(cache_key, (signature, ctx.clone()));
 
         Ok(ctx)
     }

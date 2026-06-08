@@ -235,25 +235,19 @@ fn find_plan(plans: &[ExplainPlanInfo], plan_type: &str) -> Option<String> {
 }
 
 fn validate_readonly_sql(sql: &str) -> Result<(), EngineError> {
-    let trimmed = sql.trim();
+    let normalized = normalize_sql(sql);
 
-    if trimmed.is_empty() {
+    if normalized.is_empty() {
         return Err(EngineError::SqlSyntax("SQL query is empty".to_string()));
     }
 
     let dialect = GenericDialect;
-    let statements = Parser::parse_sql(&dialect, trimmed)
+    let statements = Parser::parse_sql(&dialect, normalized)
         .map_err(|error| EngineError::SqlSyntax(error.to_string()))?;
 
     if statements.len() != 1 {
         return Err(EngineError::ReadOnlyViolation(
             "exactly one SQL statement is allowed".to_string(),
-        ));
-    }
-
-    if trimmed.ends_with(';') {
-        return Err(EngineError::ReadOnlyViolation(
-            "statement terminators are not allowed".to_string(),
         ));
     }
 
@@ -263,6 +257,17 @@ fn validate_readonly_sql(sql: &str) -> Result<(), EngineError> {
             "only read-only SELECT queries are allowed".to_string(),
         )),
     }
+}
+
+/// Strips leading/trailing whitespace and any trailing statement terminator(s).
+///
+/// A single trailing `;` is a common, valid way to end a query, so it is
+/// tolerated here. Terminators that separate multiple statements remain in the
+/// string, so multi-statement input is still rejected by the parser's
+/// statement-count check.
+fn normalize_sql(sql: &str) -> &str {
+    sql.trim()
+        .trim_end_matches(|character: char| character == ';' || character.is_whitespace())
 }
 
 fn is_readonly_query(query: &Query) -> bool {
@@ -309,7 +314,7 @@ fn is_readonly_select(select: &Select) -> bool {
 
 fn limited_sql(sql: &str, limit: Option<u32>) -> String {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
-    let trimmed = sql.trim();
+    let trimmed = normalize_sql(sql);
 
     if has_top_level_limit(trimmed) {
         trimmed.to_string()
@@ -408,9 +413,15 @@ mod tests {
     }
 
     #[test]
-    fn validate_readonly_sql_rejects_trailing_statement_terminator() {
+    fn validate_readonly_sql_allows_trailing_statement_terminator() {
+        assert!(validate_readonly_sql("select * from users;").is_ok());
+        assert!(validate_readonly_sql("select * from users ;\n").is_ok());
+    }
+
+    #[test]
+    fn validate_readonly_sql_rejects_multiple_statements_with_trailing_terminator() {
         assert!(matches!(
-            validate_readonly_sql("select * from users;"),
+            validate_readonly_sql("select * from users; drop table users;"),
             Err(EngineError::ReadOnlyViolation(_))
         ));
     }
@@ -435,6 +446,14 @@ mod tests {
     fn limited_sql_trims_input() {
         assert_eq!(
             limited_sql("  select * from users  ", Some(25)),
+            "select * from users LIMIT 25"
+        );
+    }
+
+    #[test]
+    fn limited_sql_strips_trailing_terminator() {
+        assert_eq!(
+            limited_sql("select * from users;", Some(25)),
             "select * from users LIMIT 25"
         );
     }

@@ -1,4 +1,4 @@
-﻿namespace Vistora.Core.Entities;
+namespace Vistora.Core.Entities;
 
 public class DataSource
 {
@@ -9,6 +9,8 @@ public class DataSource
     public string Type { get; set; } = string.Empty;
 
     public DataSourceConfiguration Configuration { get; set; } = new();
+
+    public ICollection<DataSourceFile> Files { get; set; } = [];
 
     public ICollection<DatasetDataSource> Datasets { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

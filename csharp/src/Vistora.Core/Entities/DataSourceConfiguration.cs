@@ -18,15 +18,7 @@ public class DataSourceConfiguration
 
     public string? Path { get; set; }
 
-    public string? Table { get; set; }
-
-    public string? Alias { get; set; }
-
-    public bool? HasHeader { get; set; }
-
-    public string? Delimiter { get; set; }
-
-    public string? Sheet { get; set; }
+    public string? StoragePath { get; set; }
 
     public Dictionary<string, string?> Options { get; set; } = new();
 }

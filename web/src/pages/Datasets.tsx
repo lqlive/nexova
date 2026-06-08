@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PlusIcon,
@@ -11,17 +11,49 @@ import FilterBar from '../components/FilterBar';
 import DataTable, { Column } from '../components/DataTable';
 import Tag from '../components/Tag';
 import OwnerAvatars from '../components/OwnerAvatars';
-import { datasets } from '../api/mockData';
+import { listDatasets, mapDatasetToItem } from '../api/client';
 import type { DatasetItem } from '../api/types';
 
 const Datasets: React.FC = () => {
+  const [datasets, setDatasets] = useState<DatasetItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('All');
   const [database, setDatabase] = useState('All');
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDatasets = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const items = await listDatasets();
+        if (!cancelled) {
+          setDatasets(items.map(mapDatasetToItem));
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load datasets');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDatasets();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const dbOptions = useMemo(
     () => ['All', ...Array.from(new Set(datasets.map((d) => d.database)))],
-    []
+    [datasets]
   );
 
   const filtered = useMemo(() => {
@@ -31,7 +63,7 @@ const Datasets: React.FC = () => {
       if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [search, type, database]);
+  }, [datasets, search, type, database]);
 
   const columns: Column<DatasetItem>[] = [
     {
@@ -97,7 +129,18 @@ const Datasets: React.FC = () => {
         ]}
       />
 
-      <DataTable columns={columns} rows={filtered} rowKey={(d) => d.id} emptyText="No datasets found" />
+      {error && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <DataTable
+        columns={columns}
+        rows={loading ? [] : filtered}
+        rowKey={(d) => d.id}
+        emptyText={loading ? 'Loading datasets...' : 'No datasets found'}
+      />
     </div>
   );
 };

@@ -1,3 +1,7 @@
+using ErrorOr;
+using Microsoft.AspNetCore.Mvc;
+using Vistora.Core.Storage;
+using Vistora.DataSources.Errors;
 using Vistora.DataSources.Models;
 using Vistora.Extensions;
 
@@ -13,6 +17,9 @@ public static class DataSourceHttpEndpointsBuilder
         api.MapGet("/{id:guid}", Get);
         api.MapPost("/", Create)
             .AddRequestValidation<DataSourceRequest>();
+        api.MapPost("/upload", UploadFile)
+            .DisableAntiforgery();
+        api.MapPost("/{id:guid}/files", AddDataSourceFile);
         api.MapPut("/{id:guid}", Update)
             .AddRequestValidation<DataSourceRequest>();
         api.MapDelete("/{id:guid}", Delete);
@@ -39,12 +46,86 @@ public static class DataSourceHttpEndpointsBuilder
 
     private static async Task<IResult> Create(
         DataSourceService service,
+        IStorageService storage,
         DataSourceRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await service.CreateAsync(request, cancellationToken);
+        var result = await service.CreateAsync(request, storage, cancellationToken);
         return result.Match<IResult>(
             dataSource => Results.Created($"/api/data-sources/{dataSource.Id}", dataSource),
+            errors => errors.ToProblem());
+    }
+
+    private static async Task<IResult> UploadFile(
+        IStorageService storage,
+        [FromForm] IFormFile? file,
+        [FromForm] string? storageDirectory,
+        CancellationToken cancellationToken)
+    {
+        if (file is null)
+        {
+            return ListOf(DataSourceErrors.FileRequired).ToProblem();
+        }
+
+        if (file.Length <= 0)
+        {
+            return ListOf(DataSourceErrors.FileEmpty).ToProblem();
+        }
+
+        var uploadId = Guid.NewGuid();
+        var safeFileName = SanitizeFileName(file.FileName);
+        var directory = string.IsNullOrWhiteSpace(storageDirectory)
+            ? $"data-sources/{uploadId:N}"
+            : storageDirectory.Trim().TrimEnd('/', '\\');
+        var storagePath = $"{directory}/{safeFileName}";
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+            ? "application/octet-stream"
+            : file.ContentType;
+
+        await using var stream = file.OpenReadStream();
+        var putResult = await storage.PutAsync(
+            storagePath,
+            stream,
+            contentType,
+            cancellationToken);
+
+        if (putResult is StoragePutResult.Conflict)
+        {
+            return ListOf(DataSourceErrors.FileAlreadyExists).ToProblem();
+        }
+
+        var downloadUri = await storage.GetDownloadUriAsync(storagePath, cancellationToken);
+        var path = downloadUri.IsFile ? downloadUri.LocalPath : downloadUri.ToString();
+        var response = new FileUploadResponse(
+            safeFileName,
+            contentType,
+            file.Length,
+            storagePath,
+            path);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> AddDataSourceFile(
+        DataSourceService service,
+        Guid id,
+        AddDataSourceFileRequest request,
+        CancellationToken cancellationToken)
+    {
+        var addFileResult = await service.AddFileAsync(
+            id,
+            request.FileName,
+            request.StoragePath,
+            request.Path,
+            request.ContentType,
+            request.Size,
+            request.HasHeader,
+            request.Delimiter,
+            request.Sheet,
+            cancellationToken);
+
+        return addFileResult.Match<IResult>(
+            Results.Ok,
             errors => errors.ToProblem());
     }
 
@@ -69,5 +150,24 @@ public static class DataSourceHttpEndpointsBuilder
         return result.Match<IResult>(
             _ => Results.NoContent(),
             errors => errors.ToProblem());
+    }
+
+    private static List<Error> ListOf(Error error)
+        => [error];
+
+    private static string SanitizeFileName(string fileName)
+    {
+        var sanitizedFileName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(sanitizedFileName))
+        {
+            return "upload";
+        }
+
+        foreach (var invalidChar in Path.GetInvalidFileNameChars())
+        {
+            sanitizedFileName = sanitizedFileName.Replace(invalidChar, '_');
+        }
+
+        return sanitizedFileName;
     }
 }

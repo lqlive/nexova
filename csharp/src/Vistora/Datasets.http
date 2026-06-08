@@ -1,0 +1,133 @@
+@host = http://localhost:5101
+@datasetId = 00000000-0000-0000-0000-000000000000
+@dataSourceId = 00000000-0000-0000-0000-000000000000
+
+### List datasets
+GET {{host}}/api/datasets
+
+### Get dataset
+GET {{host}}/api/datasets/{{datasetId}}
+
+### Create orders dataset
+POST {{host}}/api/datasets
+Content-Type: application/json
+
+{
+  "name": "Orders Time Series",
+  "sql": "select date_bin(interval '1 hour', order_time, timestamp '1970-01-01 00:00:00') as bucket, sum(amount) as total_amount, count(*) as event_count from orders_timeseries where status = 'paid' group by bucket order by bucket",
+  "description": "Hourly paid order metrics from sample CSV files.",
+  "dataSources": [
+    {
+      "dataSourceId": "{{dataSourceId}}",
+      "alias": "orders_files",
+      "order": 0
+    }
+  ],
+  "columns": [
+    {
+      "name": "bucket",
+      "type": "Timestamp(ns)",
+      "nullable": true,
+      "precision": null,
+      "scale": null,
+      "ordinal": 0
+    },
+    {
+      "name": "total_amount",
+      "type": "Decimal128(15, 2)",
+      "nullable": true,
+      "precision": 15,
+      "scale": 2,
+      "ordinal": 1
+    },
+    {
+      "name": "event_count",
+      "type": "Int64",
+      "nullable": false,
+      "precision": null,
+      "scale": null,
+      "ordinal": 2
+    }
+  ]
+}
+
+### Create federated dataset
+POST {{host}}/api/datasets
+Content-Type: application/json
+
+{
+  "name": "Federated Revenue",
+  "sql": "select r.region, sum(o.amount) as total_amount from orders o join regions r on o.region = r.region group by r.region order by r.region",
+  "description": "Example dataset backed by multiple data sources.",
+  "dataSources": [
+    {
+      "dataSourceId": "{{dataSourceId}}",
+      "alias": "orders",
+      "order": 0
+    }
+  ],
+  "columns": [
+    {
+      "name": "region",
+      "type": "Utf8",
+      "nullable": true,
+      "precision": null,
+      "scale": null,
+      "ordinal": 0
+    },
+    {
+      "name": "total_amount",
+      "type": "Decimal128(15, 2)",
+      "nullable": true,
+      "precision": 15,
+      "scale": 2,
+      "ordinal": 1
+    }
+  ]
+}
+
+### Update dataset
+PUT {{host}}/api/datasets/{{datasetId}}
+Content-Type: application/json
+
+{
+  "name": "Orders Time Series Updated",
+  "sql": "select date_bin(interval '1 hour', order_time, timestamp '1970-01-01 00:00:00') as bucket, sum(amount) as total_amount, count(*) as event_count from orders_timeseries where status = 'paid' group by bucket order by bucket",
+  "description": "Updated hourly paid order metrics.",
+  "dataSources": [
+    {
+      "dataSourceId": "{{dataSourceId}}",
+      "alias": "orders_files",
+      "order": 0
+    }
+  ],
+  "columns": [
+    {
+      "name": "bucket",
+      "type": "Timestamp(ns)",
+      "nullable": true,
+      "precision": null,
+      "scale": null,
+      "ordinal": 0
+    },
+    {
+      "name": "total_amount",
+      "type": "Decimal128(15, 2)",
+      "nullable": true,
+      "precision": 15,
+      "scale": 2,
+      "ordinal": 1
+    },
+    {
+      "name": "event_count",
+      "type": "Int64",
+      "nullable": false,
+      "precision": null,
+      "scale": null,
+      "ordinal": 2
+    }
+  ]
+}
+
+### Delete dataset
+DELETE {{host}}/api/datasets/{{datasetId}}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   MagnifyingGlassIcon,
@@ -22,13 +22,14 @@ import {
   Square3Stack3DIcon,
 } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
-import {
-  datasets,
-  datasourcePreview,
-  datasourceTables,
-  findDataset,
-} from '../api/mockData';
-import type { GridColumnType } from '../api/types';
+import { getDataSource, listDataSources, listEngineTables, queryEngine } from '../api/client';
+import type {
+  DataSourceResponse,
+  EngineColumnInfo,
+  EngineQueryResult,
+  EngineTableInfo,
+  GridColumnType,
+} from '../api/types';
 
 // ---------------------------------------------------------------------------
 // Explorer tree
@@ -48,9 +49,20 @@ interface TreeNode {
   id: string;
   label: string;
   icon: NodeIcon;
+  selection?: TableSelection;
   children?: TreeNode[];
   defaultOpen?: boolean;
   active?: boolean;
+}
+
+interface TableSelection {
+  dataSource: DataSourceResponse;
+  table: EngineTableInfo;
+}
+
+interface DataSourceTables {
+  dataSource: DataSourceResponse;
+  tables: EngineTableInfo[];
 }
 
 const nodeIcon = (icon: NodeIcon) => {
@@ -77,14 +89,27 @@ const nodeIcon = (icon: NodeIcon) => {
   }
 };
 
-const TreeItem: React.FC<{ node: TreeNode; depth: number }> = ({ node, depth }) => {
+const TreeItem: React.FC<{
+  node: TreeNode;
+  depth: number;
+  onTableSelect?: (selection: TableSelection) => void;
+}> = ({ node, depth, onTableSelect }) => {
   const [open, setOpen] = useState(!!node.defaultOpen);
   const hasChildren = !!node.children?.length;
 
   return (
     <div>
       <button
-        onClick={() => hasChildren && setOpen((o) => !o)}
+        onClick={() => {
+          if (node.selection) {
+            onTableSelect?.(node.selection);
+            return;
+          }
+
+          if (hasChildren) {
+            setOpen((o) => !o);
+          }
+        }}
         className={classNames(
           'w-full flex items-center gap-1.5 py-2 pr-2 text-left hover:bg-gray-50 text-[13px]',
           node.active ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-700'
@@ -104,7 +129,9 @@ const TreeItem: React.FC<{ node: TreeNode; depth: number }> = ({ node, depth }) 
         <span className="truncate font-mono">{node.label}</span>
       </button>
       {open &&
-        node.children?.map((c) => <TreeItem key={c.id} node={c} depth={depth + 1} />)}
+        node.children?.map((c) => (
+          <TreeItem key={c.id} node={c} depth={depth + 1} onTableSelect={onTableSelect} />
+        ))}
     </div>
   );
 };
@@ -136,41 +163,151 @@ const TypeBadge: React.FC<{ type: GridColumnType }> = ({ type }) => {
 // ---------------------------------------------------------------------------
 const SqlEditor: React.FC = () => {
   const { id } = useParams();
-  const dataset = findDataset(Number(id)) ?? datasets[0];
+  const [datasource, setDatasource] = useState<DataSourceResponse | null>(null);
+  const [sourceTables, setSourceTables] = useState<DataSourceTables[]>([]);
+  const [activeTable, setActiveTable] = useState<EngineTableInfo | null>(null);
+  const [result, setResult] = useState<EngineQueryResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState('Run a query to see results.');
   const [search, setSearch] = useState('');
   const [resultTab, setResultTab] = useState<'messages' | 'results'>('results');
-  const [sql, setSql] = useState(`select * from [${dataset.name}]`);
+  const [sql, setSql] = useState('');
 
-  const tableNodes: TreeNode[] = useMemo(
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEditorData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const sources = await listDataSources();
+        if (sources.length === 0) {
+          throw new Error('No datasource found. Create a datasource first.');
+        }
+
+        let preferredSource: DataSourceResponse | undefined;
+        if (id) {
+          try {
+            preferredSource = await getDataSource(id);
+          } catch {
+            preferredSource = undefined;
+          }
+        }
+
+        const orderedSources = preferredSource
+          ? [preferredSource, ...sources.filter((source) => source.id !== preferredSource.id)]
+          : sources;
+        const loadedSourceTables = await Promise.all(
+          orderedSources.map(async (source) => ({
+            dataSource: source,
+            tables: await listEngineTables(source),
+          }))
+        );
+        const firstGroup = loadedSourceTables.find((group) => group.tables.length > 0) ?? loadedSourceTables[0];
+        const firstTable = firstGroup?.tables[0] ?? null;
+        if (!cancelled) {
+          setSourceTables(loadedSourceTables);
+          setDatasource(firstGroup?.dataSource ?? null);
+          setActiveTable(firstTable);
+          setSql(firstTable ? `select * from ${tableReference(firstTable)}` : '');
+          setMessage(firstTable ? 'Ready.' : 'No tables found for this datasource.');
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          const nextError = loadError instanceof Error ? loadError.message : 'Failed to load SQL editor data';
+          setError(nextError);
+          setMessage(nextError);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadEditorData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const runQuery = useCallback(async () => {
+    if (!datasource || !sql.trim()) return;
+
+    try {
+      setRunning(true);
+      setError(null);
+      setMessage('Running query...');
+      const queryResult = await queryEngine(datasource, sql, 10000);
+      setResult(queryResult);
+      setResultTab('results');
+      setMessage(
+        `(${queryResult.rowCount} rows affected)\nTotal execution time: ${queryResult.durationMs} ms`
+      );
+    } catch (runError) {
+      const nextError = runError instanceof Error ? runError.message : 'Failed to run query';
+      setError(nextError);
+      setMessage(nextError);
+      setResultTab('messages');
+    } finally {
+      setRunning(false);
+    }
+  }, [datasource, sql]);
+
+  const handleTableSelect = (selection: TableSelection) => {
+    setDatasource(selection.dataSource);
+    setActiveTable(selection.table);
+    setSql(`select * from ${tableReference(selection.table)}`);
+    setResult(null);
+    setMessage('Ready.');
+    setResultTab('results');
+  };
+
+  const dataSourceTrees: TreeNode[] = useMemo(
     () =>
-      datasourceTables(dataset.database, dataset.name).map((t) => ({
-        id: `tbl-${t}`,
-        label: t,
-        icon: 'table' as NodeIcon,
-        active: t === dataset.name,
-      })),
-    [dataset]
-  );
+      sourceTables.map((group) => {
+        const tableNodes = group.tables
+          .filter((table) => table.name.toLowerCase().includes(search.toLowerCase()))
+          .map((table) => ({
+            id: `tbl-${group.dataSource.id}-${table.schema ?? 'default'}-${table.name}`,
+            label: table.name,
+            icon: 'table' as NodeIcon,
+            selection: { dataSource: group.dataSource, table },
+            active:
+              group.dataSource.id === datasource?.id &&
+              table.name === activeTable?.name &&
+              table.schema === activeTable?.schema,
+          }));
 
-  const tree: TreeNode = useMemo(
-    () => ({
-      id: 'lakehouse',
-      label: 'lakehouse',
-      icon: 'db',
-      defaultOpen: true,
-      children: [
-        {
-          id: 'schemas',
-          label: 'Schemas',
-          icon: 'folder',
-          defaultOpen: true,
+        return {
+          id: group.dataSource.id,
+          label: group.dataSource.name,
+          icon: 'db' as NodeIcon,
+          defaultOpen: group.dataSource.id === datasource?.id || sourceTables.length === 1,
           children: [
-            { id: 'tables', label: 'Tables', icon: 'folder', defaultOpen: true, children: tableNodes },
+            {
+              id: `${group.dataSource.id}-schemas`,
+              label: 'Schemas',
+              icon: 'folder' as NodeIcon,
+              defaultOpen: group.dataSource.id === datasource?.id || sourceTables.length === 1,
+              children: [
+                {
+                  id: `${group.dataSource.id}-tables`,
+                  label: 'Tables',
+                  icon: 'folder' as NodeIcon,
+                  defaultOpen: group.dataSource.id === datasource?.id || sourceTables.length === 1,
+                  children: tableNodes,
+                },
+              ],
+            },
           ],
-        },
-      ],
-    }),
-    [tableNodes]
+        };
+      }),
+    [activeTable, datasource, search, sourceTables]
   );
 
   const queriesTree: TreeNode = useMemo(
@@ -196,15 +333,20 @@ const SqlEditor: React.FC = () => {
     []
   );
 
-  const { columns, rows } = datasourcePreview;
+  const columns = result?.columns ?? [];
+  const rows = result?.rows ?? [];
   const lineCount = sql.split('\n').length;
 
   const ToolbarButton: React.FC<{
     icon: React.ReactNode;
     label: string;
     accent?: boolean;
-  }> = ({ icon, label, accent }) => (
+    onClick?: () => void;
+    disabled?: boolean;
+  }> = ({ icon, label, accent, onClick, disabled }) => (
     <button
+      onClick={onClick}
+      disabled={disabled}
       className={classNames(
         'flex items-center gap-1 px-2 h-7 rounded text-xs hover:bg-gray-100 transition-colors',
         accent ? 'text-green-600' : 'text-gray-600'
@@ -238,7 +380,9 @@ const SqlEditor: React.FC = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto py-1">
-          <TreeItem node={tree} depth={0} />
+          {dataSourceTrees.map((tree) => (
+            <TreeItem key={tree.id} node={tree} depth={0} onTableSelect={handleTableSelect} />
+          ))}
           <TreeItem node={queriesTree} depth={0} />
         </div>
       </aside>
@@ -257,7 +401,13 @@ const SqlEditor: React.FC = () => {
 
         {/* Toolbar */}
         <div className="h-9 flex items-center gap-1 border-b border-gray-100 px-2">
-          <ToolbarButton icon={<PlayIcon className="h-4 w-4" />} label="Run" accent />
+          <ToolbarButton
+            icon={<PlayIcon className="h-4 w-4" />}
+            label={running ? 'Running...' : 'Run'}
+            accent
+            onClick={runQuery}
+            disabled={running || !datasource || !sql.trim()}
+          />
           <span className="w-px h-4 bg-gray-200 mx-1" />
           <ToolbarButton icon={<BookmarkIcon className="h-4 w-4" />} label="Save" />
           <ToolbarButton icon={<ViewColumnsIcon className="h-4 w-4" />} label="Save as view" />
@@ -321,12 +471,22 @@ const SqlEditor: React.FC = () => {
         <div className="flex-1 overflow-auto">
           {resultTab === 'messages' ? (
             <div className="p-4 font-mono text-xs text-gray-600">
-              (1,000 rows affected)
-              <br />
-              Total execution time: 00:00:00.333
+              {message.split('\n').map((line) => (
+                <React.Fragment key={line}>
+                  {line}
+                  <br />
+                </React.Fragment>
+              ))}
             </div>
           ) : (
-            <table className="border-collapse text-xs w-full">
+            error ? (
+              <div className="p-4 font-mono text-xs text-red-700">{error}</div>
+            ) : loading ? (
+              <div className="p-4 font-mono text-xs text-gray-500">Loading datasource...</div>
+            ) : rows.length === 0 ? (
+              <div className="p-4 font-mono text-xs text-gray-500">No results yet.</div>
+            ) : (
+              <table className="border-collapse text-xs w-full">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50">
                   <th className="sticky left-0 z-20 bg-gray-50 w-10 px-2 py-1.5 border-b border-r border-gray-200 text-gray-400 font-normal text-right">
@@ -338,7 +498,7 @@ const SqlEditor: React.FC = () => {
                       className="px-3 py-1.5 border-b border-r border-gray-200 text-left font-medium text-gray-600 whitespace-nowrap"
                     >
                       <span className="flex items-center gap-1.5">
-                        <TypeBadge type={col.type} />
+                        <TypeBadge type={mapEngineColumnType(col)} />
                         {col.name}
                       </span>
                     </th>
@@ -356,18 +516,19 @@ const SqlEditor: React.FC = () => {
                         key={ci}
                         className={classNames(
                           'px-3 py-1.5 border-b border-r border-gray-100 whitespace-nowrap',
-                          columns[ci].type === 'int' || columns[ci].type === 'decimal'
+                          isNumericColumn(columns[ci])
                             ? 'text-right font-mono text-gray-700'
                             : 'text-gray-700'
                         )}
                       >
-                        {cell}
+                        {formatCell(cell)}
                       </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            )
           )}
         </div>
 
@@ -375,15 +536,42 @@ const SqlEditor: React.FC = () => {
         <div className="h-7 flex items-center justify-between px-3 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
             <CheckCircleIcon className="h-4 w-4 text-green-500" />
-            Succeeded · 333 ms
+            {running ? 'Running...' : result ? `Succeeded · ${result.durationMs} ms` : loading ? 'Loading...' : 'Ready'}
           </span>
           <span>
-            {columns.length} columns · 1,000 rows
+            {columns.length} columns · {rows.length} rows
           </span>
         </div>
       </section>
     </div>
   );
+};
+
+const tableReference = (table: EngineTableInfo): string =>
+  table.schema
+    ? `${quoteIdentifier(table.schema)}.${quoteIdentifier(table.name)}`
+    : quoteIdentifier(table.name);
+
+const quoteIdentifier = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+
+const mapEngineColumnType = (column: EngineColumnInfo): GridColumnType => {
+  const type = column.type.toLowerCase();
+  if (type.includes('date') || type.includes('timestamp')) return 'date';
+  if (type.includes('decimal') || type.includes('float') || type.includes('double')) return 'decimal';
+  if (type.includes('int') || type.includes('uint')) return 'int';
+  return 'string';
+};
+
+const isNumericColumn = (column: EngineColumnInfo | undefined): boolean => {
+  if (!column) return false;
+  const type = mapEngineColumnType(column);
+  return type === 'int' || type === 'decimal';
+};
+
+const formatCell = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 };
 
 export default SqlEditor;
