@@ -1,7 +1,8 @@
+use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 use std::sync::Arc;
 
-use calamine::{Data, Reader, open_workbook_auto};
+use calamine::{Data, Reader, Sheets, open_workbook_auto, open_workbook_auto_from_rs};
 use datafusion::arrow::array::{ArrayRef, Float64Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -9,13 +10,28 @@ use datafusion::prelude::SessionContext;
 
 use crate::{error::EngineError, models::DataSourceConnection};
 
-pub fn register(
+pub fn register_local(
     ctx: &SessionContext,
     table: &str,
     path: &Path,
     source: &DataSourceConnection,
 ) -> Result<(), EngineError> {
-    let batch = read_excel(path, source)?;
+    let mut workbook = open_workbook_auto(path)
+        .map_err(|error| EngineError::FileSource(format!("open excel: {error}")))?;
+    let batch = read_workbook(&mut workbook, source)?;
+    ctx.register_batch(table, batch)?;
+    Ok(())
+}
+
+pub fn register_bytes(
+    ctx: &SessionContext,
+    table: &str,
+    bytes: Vec<u8>,
+    source: &DataSourceConnection,
+) -> Result<(), EngineError> {
+    let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
+        .map_err(|error| EngineError::FileSource(format!("open excel: {error}")))?;
+    let batch = read_workbook(&mut workbook, source)?;
     ctx.register_batch(table, batch)?;
     Ok(())
 }
@@ -24,10 +40,10 @@ pub fn register(
 ///
 /// Each column is inferred as `Float64` when every non-empty cell is numeric,
 /// otherwise it falls back to `Utf8`.
-fn read_excel(path: &Path, source: &DataSourceConnection) -> Result<RecordBatch, EngineError> {
-    let mut workbook = open_workbook_auto(path)
-        .map_err(|error| EngineError::FileSource(format!("open excel: {error}")))?;
-
+fn read_workbook<RS: Read + Seek>(
+    workbook: &mut Sheets<RS>,
+    source: &DataSourceConnection,
+) -> Result<RecordBatch, EngineError> {
     let sheet_name = match &source.sheet {
         Some(sheet) => sheet.clone(),
         None => workbook

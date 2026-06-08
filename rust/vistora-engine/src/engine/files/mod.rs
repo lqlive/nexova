@@ -9,6 +9,7 @@ mod csv;
 mod excel;
 mod json;
 mod parquet;
+mod remote;
 
 use std::{
     collections::HashSet,
@@ -34,7 +35,7 @@ pub async fn test_connection(
     ctx: &SessionContext,
     source: &DataSourceConnection,
 ) -> Result<(), EngineError> {
-    let tables = discover_tables(source)?;
+    let tables = discover(source).await?;
     for table in tables {
         ctx.sql(&format!("SELECT * FROM {} LIMIT 0", table.name))
             .await?
@@ -45,7 +46,8 @@ pub async fn test_connection(
 }
 
 pub async fn list_tables(source: &DataSourceConnection) -> Result<Vec<TableInfo>, EngineError> {
-    Ok(discover_tables(source)?
+    Ok(discover(source)
+        .await?
         .into_iter()
         .map(|table| TableInfo {
             schema: None,
@@ -60,7 +62,7 @@ pub async fn list_columns(
     source: &DataSourceConnection,
     table: String,
 ) -> Result<Vec<ColumnInfo>, EngineError> {
-    let table = resolve_table_name(source, table)?;
+    let table = resolve_table_name(source, table).await?;
     let df = ctx.table(table.as_str()).await?;
     Ok(columns_from_fields(df.schema().fields()))
 }
@@ -115,7 +117,14 @@ pub async fn execute_federated_query(
 
 /// Fingerprint of the files backing a source, used to invalidate cached
 /// contexts when files are added, removed, or modified in the source directory.
-pub fn path_signature(source: &DataSourceConnection) -> Result<String, EngineError> {
+pub async fn path_signature(source: &DataSourceConnection) -> Result<String, EngineError> {
+    if remote::is_s3(source) {
+        return remote::signature(source).await;
+    }
+    local_signature(source)
+}
+
+fn local_signature(source: &DataSourceConnection) -> Result<String, EngineError> {
     let root = PathBuf::from(source.require_path()?);
     let metadata = fs::metadata(&root)
         .map_err(|error| EngineError::FileSource(format!("read path metadata: {error}")))?;
@@ -158,7 +167,7 @@ fn file_fingerprint(path: &Path) -> String {
 pub async fn build_context(source: &DataSourceConnection) -> Result<SessionContext, EngineError> {
     let ctx = SessionContext::new();
 
-    for table in discover_tables(source)? {
+    for table in discover(source).await? {
         register_table(&ctx, &table, source).await?;
     }
 
@@ -179,7 +188,7 @@ pub async fn build_federated_context(
 
     for source in sources {
         ensure_file_source(source)?;
-        for table in discover_tables(source)? {
+        for table in discover(source).await? {
             if !registered_tables.insert(table.name.clone()) {
                 return Err(EngineError::FileSource(format!(
                     "duplicate table name '{}' across data sources",
@@ -200,7 +209,7 @@ pub async fn register_federated_source(
     registered_tables: &mut HashSet<String>,
 ) -> Result<(), EngineError> {
     ensure_file_source(source)?;
-    let mut tables = discover_tables(source)?;
+    let mut tables = discover(source).await?;
     let alias = explicit_alias(source);
 
     if alias.is_some() && tables.len() > 1 {
@@ -234,7 +243,8 @@ pub async fn register_cached_federated_source(
     registered_tables: &mut HashSet<String>,
 ) -> Result<(), EngineError> {
     ensure_file_source(source)?;
-    let mut tables = discover_tables(source)?;
+    ensure_remote_store(ctx, source)?;
+    let mut tables = discover(source).await?;
     let alias = explicit_alias(source);
 
     if alias.is_some() && tables.len() > 1 {
@@ -285,28 +295,85 @@ async fn register_table(
     table: &FileTable,
     source: &DataSourceConnection,
 ) -> Result<(), EngineError> {
-    match table.kind {
-        DataSourceKind::Csv => csv::register(ctx, table.name.as_str(), &table.path, source).await,
-        DataSourceKind::Json => json::register(ctx, table.name.as_str(), &table.path).await,
-        DataSourceKind::Excel => excel::register(ctx, table.name.as_str(), &table.path, source),
-        DataSourceKind::Parquet => parquet::register(ctx, table.name.as_str(), &table.path).await,
-        DataSourceKind::Postgres
-        | DataSourceKind::MySql
-        | DataSourceKind::ClickHouse
-        | DataSourceKind::MongoDb
-        | DataSourceKind::Sqlite
-        | DataSourceKind::Files => Err(EngineError::UnsupportedDataSource),
+    let name = table.name.as_str();
+    match &table.location {
+        Location::Local(path) => match table.kind {
+            DataSourceKind::Csv => csv::register_local(ctx, name, path, source).await,
+            DataSourceKind::Json => json::register(ctx, name, &path_string(path)).await,
+            DataSourceKind::Excel => excel::register_local(ctx, name, path, source),
+            DataSourceKind::Parquet => parquet::register(ctx, name, &path_string(path)).await,
+            DataSourceKind::Postgres
+            | DataSourceKind::MySql
+            | DataSourceKind::ClickHouse
+            | DataSourceKind::MongoDb
+            | DataSourceKind::Sqlite
+            | DataSourceKind::Files => Err(EngineError::UnsupportedDataSource),
+        },
+        Location::Remote(object) => {
+            ctx.runtime_env()
+                .register_object_store(&object.base_url, object.store.clone());
+            match table.kind {
+                DataSourceKind::Csv => {
+                    let bytes = remote::read_object(&object.store, &object.object_path).await?;
+                    csv::register_remote(ctx, name, &object.url, &bytes, source).await
+                }
+                DataSourceKind::Json => json::register(ctx, name, &object.url).await,
+                DataSourceKind::Parquet => parquet::register(ctx, name, &object.url).await,
+                DataSourceKind::Excel => {
+                    let bytes = remote::read_object(&object.store, &object.object_path).await?;
+                    excel::register_bytes(ctx, name, bytes, source)
+                }
+                DataSourceKind::Postgres
+                | DataSourceKind::MySql
+                | DataSourceKind::ClickHouse
+                | DataSourceKind::MongoDb
+                | DataSourceKind::Sqlite
+                | DataSourceKind::Files => Err(EngineError::UnsupportedDataSource),
+            }
+        }
     }
 }
 
-#[derive(Debug, Clone)]
-struct FileTable {
-    name: String,
-    path: PathBuf,
-    kind: DataSourceKind,
+/// Register the object store for an S3-backed source onto the given context.
+/// No-op for local filesystem sources.
+fn ensure_remote_store(
+    ctx: &SessionContext,
+    source: &DataSourceConnection,
+) -> Result<(), EngineError> {
+    if remote::is_s3(source) {
+        let (store, base_url) = remote::store_for(source)?;
+        ctx.runtime_env().register_object_store(&base_url, store);
+    }
+    Ok(())
 }
 
-fn discover_tables(source: &DataSourceConnection) -> Result<Vec<FileTable>, EngineError> {
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+#[derive(Clone)]
+struct FileTable {
+    name: String,
+    kind: DataSourceKind,
+    location: Location,
+}
+
+#[derive(Clone)]
+enum Location {
+    Local(PathBuf),
+    Remote(remote::RemoteObject),
+}
+
+/// Dispatch discovery to the local filesystem or S3 backend.
+async fn discover(source: &DataSourceConnection) -> Result<Vec<FileTable>, EngineError> {
+    if remote::is_s3(source) {
+        remote::discover(source, source.kind()?).await
+    } else {
+        discover_local(source)
+    }
+}
+
+fn discover_local(source: &DataSourceConnection) -> Result<Vec<FileTable>, EngineError> {
     let requested_kind = source.kind()?;
     let root = PathBuf::from(source.require_path()?);
     let metadata = fs::metadata(&root)
@@ -361,8 +428,8 @@ fn discover_directory_tables(
         if kind_matches(requested_kind, kind) {
             tables.push(FileTable {
                 name: table_name_from_path(&path),
-                path,
                 kind,
+                location: Location::Local(path),
             });
         }
     }
@@ -404,23 +471,23 @@ fn discover_file_table(
 
     Ok(FileTable {
         name: explicit_name.unwrap_or_else(|| table_name_from_path(path)),
-        path: path.to_path_buf(),
         kind,
+        location: Location::Local(path.to_path_buf()),
     })
 }
 
-fn resolve_table_name(
+async fn resolve_table_name(
     source: &DataSourceConnection,
     requested_table: String,
 ) -> Result<String, EngineError> {
     let requested_table = requested_table.trim();
-    let tables = discover_tables(source)?;
+    let tables = discover(source).await?;
 
     if requested_table.is_empty() {
         return Ok(tables
             .first()
             .map(|table| table.name.clone())
-            .expect("discover_tables returns at least one table"));
+            .expect("discover returns at least one table"));
     }
 
     if tables.iter().any(|table| table.name == requested_table) {

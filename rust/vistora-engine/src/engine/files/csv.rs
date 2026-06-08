@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Cursor},
     path::Path,
 };
 
@@ -14,13 +14,47 @@ use crate::{
 
 const INFER_MAX_ROWS: usize = 1_000;
 
-pub async fn register(
+pub async fn register_local(
     ctx: &SessionContext,
     table: &str,
     path: &Path,
     source: &DataSourceConnection,
 ) -> Result<(), EngineError> {
-    let schema = csv_schema(path, source)?;
+    let schema = if let Some(schema_override) = source.schema_override.as_ref() {
+        schema_from_override(schema_override)?
+    } else {
+        let file = File::open(path).map_err(|error| {
+            EngineError::FileSource(format!("open csv for schema inference: {error}"))
+        })?;
+        infer_schema(BufReader::new(file), source)?
+    };
+
+    register_csv(ctx, table, &path_string(path), schema, source).await
+}
+
+pub async fn register_remote(
+    ctx: &SessionContext,
+    table: &str,
+    url: &str,
+    bytes: &[u8],
+    source: &DataSourceConnection,
+) -> Result<(), EngineError> {
+    let schema = if let Some(schema_override) = source.schema_override.as_ref() {
+        schema_from_override(schema_override)?
+    } else {
+        infer_schema(BufReader::new(Cursor::new(bytes)), source)?
+    };
+
+    register_csv(ctx, table, url, schema, source).await
+}
+
+async fn register_csv(
+    ctx: &SessionContext,
+    table: &str,
+    target: &str,
+    schema: Schema,
+    source: &DataSourceConnection,
+) -> Result<(), EngineError> {
     let mut options = CsvReadOptions::new().has_header(source.has_header.unwrap_or(true));
 
     if let Some(delimiter) = source
@@ -31,21 +65,10 @@ pub async fn register(
         options = options.delimiter(delimiter);
     }
 
-    if let Some(schema) = schema.as_ref() {
-        options = options.schema(schema);
-    }
+    options = options.schema(&schema);
 
-    let path = path_string(path);
-    ctx.register_csv(table, path.as_str(), options).await?;
+    ctx.register_csv(table, target, options).await?;
     Ok(())
-}
-
-fn csv_schema(path: &Path, source: &DataSourceConnection) -> Result<Option<Schema>, EngineError> {
-    if let Some(schema_override) = source.schema_override.as_ref() {
-        return Ok(Some(schema_from_override(schema_override)?));
-    }
-
-    infer_schema(path, source).map(Some)
 }
 
 fn schema_from_override(columns: &[ColumnSchemaOverride]) -> Result<Schema, EngineError> {
@@ -89,13 +112,13 @@ fn data_type_from_override(column: &ColumnSchemaOverride) -> Result<DataType, En
     }
 }
 
-fn infer_schema(path: &Path, source: &DataSourceConnection) -> Result<Schema, EngineError> {
+fn infer_schema(
+    reader: impl BufRead,
+    source: &DataSourceConnection,
+) -> Result<Schema, EngineError> {
     let delimiter = delimiter(source);
     let has_header = source.has_header.unwrap_or(true);
-    let file = File::open(path).map_err(|error| {
-        EngineError::FileSource(format!("open csv for schema inference: {error}"))
-    })?;
-    let mut lines = BufReader::new(file).lines();
+    let mut lines = reader.lines();
 
     let Some(first_line) = lines.next() else {
         return Err(EngineError::FileSource("csv file is empty".to_string()));

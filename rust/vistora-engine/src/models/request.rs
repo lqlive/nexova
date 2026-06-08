@@ -50,6 +50,9 @@ pub struct DataSourceConnection {
     /// PostgreSQL defaults to `public`; MySQL defaults to the current database.
     pub schema: Option<String>,
     // File based connection fields (csv / json / excel / parquet / files).
+    /// Local filesystem path, or an `s3://bucket/prefix` URL for S3-backed sources.
+    /// For S3, credentials are resolved from the engine-side S3 config file keyed
+    /// by bucket name; they are never carried in the request.
     pub path: Option<String>,
     /// Logical table name exposed to SQL for a single file source.
     /// Defaults to the sanitized file name when omitted.

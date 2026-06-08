@@ -189,7 +189,7 @@ impl BackendRegistry {
         source: &DataSourceConnection,
     ) -> Result<Arc<SessionContext>, EngineError> {
         let cache_key = file_cache_key(source)?;
-        let signature = files::path_signature(source)?;
+        let signature = files::path_signature(source).await?;
 
         if let Some((cached_signature, ctx)) = self.file_contexts.read().await.get(&cache_key) {
             if *cached_signature == signature {
