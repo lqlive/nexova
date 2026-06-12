@@ -7,8 +7,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Apache.DataFusion" Version="0.1.3" />
       <PackageReference Include="Apache.DataFusion.Native.win-x64" Version="0.1.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Nexova.Core\Nexova.Core.csproj" />
     </ItemGroup>
 
 </Project>

@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Nexova.Connectors\Nexova.Connectors.csproj" />
     <ProjectReference Include="..\Nexova.Core\Nexova.Core.csproj" />
     <ProjectReference Include="..\Nexova.Database.PostgreSQL\Nexova.Database.PostgreSql.csproj" />
     <ProjectReference Include="..\Nexova.Storage.Aws\Nexova.Storage.Aws.csproj" />
