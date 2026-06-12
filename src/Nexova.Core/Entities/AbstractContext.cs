@@ -5,6 +5,9 @@ namespace Nexova.Core.Entities;
 public abstract class AbstractContext<TContext> : DbContext, IContext
     where TContext : DbContext
 {
+    public AbstractContext(DbContextOptions<TContext> options)
+        : base(options)
+    { }
     public DbSet<DataSource> DataSources { get; set; } 
     public DbSet<Dataset> Datasets { get; set; }
     public DbSet<User> Users { get; set; }

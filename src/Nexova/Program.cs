@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddNexovaCore()
     .AddInMemoryStore()
-    //.AddPostgreSqlDatabase()
+    .AddPostgreSqlDatabase()
     .AddFileStorage()
     .AddAwsS3Storage();
 
