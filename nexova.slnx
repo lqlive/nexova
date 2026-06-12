@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Nexova.Connectors/Nexova.Connectors.csproj" />
     <Project Path="src/Nexova.Core/Nexova.Core.csproj" />
     <Project Path="src/Nexova.Database.PostgreSQL/Nexova.Database.PostgreSql.csproj" Id="95b11738-2c65-4910-8c84-d7c83d24b24c" />
     <Project Path="src/Nexova.Storage.Aws/Nexova.Storage.Aws.csproj" Id="97876a51-10f1-4e88-9e16-ff6ed3032ead" />
