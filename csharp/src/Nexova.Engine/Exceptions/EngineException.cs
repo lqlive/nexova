@@ -11,8 +11,6 @@ public enum EngineErrorKind
     InvalidConnection,
     SqlSyntax,
     ReadOnlyViolation,
-    TableNotFound,
-    ColumnNotFound,
     QueryExecution,
     InvalidSql,
     Timeout,
@@ -43,8 +41,6 @@ public sealed class EngineException : Exception
         EngineErrorKind.InvalidConnection => "connection_failed",
         EngineErrorKind.SqlSyntax or EngineErrorKind.InvalidSql => "sql_syntax_error",
         EngineErrorKind.ReadOnlyViolation => "read_only_violation",
-        EngineErrorKind.TableNotFound => "table_not_found",
-        EngineErrorKind.ColumnNotFound => "column_not_found",
         EngineErrorKind.QueryExecution => "query_execution_failed",
         EngineErrorKind.Timeout => "query_timeout",
         EngineErrorKind.FileSource => "file_source_error",
@@ -57,8 +53,6 @@ public sealed class EngineException : Exception
         EngineErrorKind.InvalidConnection => "connection_failed",
         EngineErrorKind.SqlSyntax or EngineErrorKind.InvalidSql => "sql_syntax_error",
         EngineErrorKind.ReadOnlyViolation => "permission_or_read_only",
-        EngineErrorKind.TableNotFound => "table_not_found",
-        EngineErrorKind.ColumnNotFound => "column_not_found",
         EngineErrorKind.QueryExecution => "query_execution",
         EngineErrorKind.Timeout => "timeout",
         EngineErrorKind.FileSource => "file_source",
@@ -71,8 +65,6 @@ public sealed class EngineException : Exception
         EngineErrorKind.InvalidConnection => "Connection failed",
         EngineErrorKind.SqlSyntax or EngineErrorKind.InvalidSql => "SQL syntax error",
         EngineErrorKind.ReadOnlyViolation => "Permission or read-only restriction",
-        EngineErrorKind.TableNotFound => "Table not found",
-        EngineErrorKind.ColumnNotFound => "Column not found",
         EngineErrorKind.QueryExecution => "Query execution failed",
         EngineErrorKind.Timeout => "Query timed out",
         EngineErrorKind.FileSource => "File source error",
@@ -96,12 +88,6 @@ public sealed class EngineException : Exception
 
     public static EngineException ReadOnlyViolation(string detail) =>
         new(EngineErrorKind.ReadOnlyViolation, detail);
-
-    public static EngineException TableNotFound(string detail) =>
-        new(EngineErrorKind.TableNotFound, detail);
-
-    public static EngineException ColumnNotFound(string detail) =>
-        new(EngineErrorKind.ColumnNotFound, detail);
 
     public static EngineException QueryExecution(string detail) =>
         new(EngineErrorKind.QueryExecution, detail);

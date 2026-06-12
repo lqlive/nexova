@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Nexova.Core/Nexova.Core.csproj" />
+    <Project Path="src/Nexova.Database.PostgreSQL/Nexova.Database.PostgreSQL.csproj" />
+    <Project Path="src/Nexova.Engine/Nexova.Engine.csproj" />
+    <Project Path="src/Nexova/Nexova.csproj" />
+  </Folder>
+</Solution>

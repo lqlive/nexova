@@ -155,7 +155,7 @@ public sealed class DatabaseSourceRegistrar
         }
         catch (Exception exception) when (exception is not EngineException)
         {
-            throw EngineErrorClassifier.ClassifyProvider("connection", exception);
+            throw EngineErrorClassifier.ClassifyConnection(exception);
         }
     }
 

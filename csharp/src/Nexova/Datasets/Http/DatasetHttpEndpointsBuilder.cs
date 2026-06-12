@@ -43,7 +43,7 @@ public static class DatasetHttpEndpointsBuilder
         CancellationToken cancellationToken)
     {
         var result = await service.CreateAsync(request, cancellationToken);
-        return result.Match<IResult>(
+        return result.Match(
             dataset => Results.Created($"/api/datasets/{dataset.Id}", dataset),
             errors => errors.ToProblem());
     }
@@ -55,7 +55,7 @@ public static class DatasetHttpEndpointsBuilder
         CancellationToken cancellationToken)
     {
         var result = await service.UpdateAsync(id, request, cancellationToken);
-        return result.Match<IResult>(
+        return result.Match(
             Results.Ok,
             errors => errors.ToProblem());
     }
@@ -66,7 +66,7 @@ public static class DatasetHttpEndpointsBuilder
         CancellationToken cancellationToken)
     {
         var result = await service.DeleteAsync(id, cancellationToken);
-        return result.Match<IResult>(
+        return result.Match(
             _ => Results.NoContent(),
             errors => errors.ToProblem());
     }
