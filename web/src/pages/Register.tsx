@@ -51,7 +51,7 @@ const Register: React.FC = () => {
   // Registration configuration
   const registerConfig: RegisterConfig = {
     enableEmailRegister: true,
-    appName: 'Vistora',
+    appName: 'Nexova',
     requireTermsAcceptance: true,
   };
 
@@ -248,7 +248,7 @@ const Register: React.FC = () => {
           Create your account
         </h2>
         <p className="text-center text-sm text-gray-600 mb-8">
-          Join Vistora and start exploring your data
+          Join Nexova and start exploring your data
         </p>
       </div>
 

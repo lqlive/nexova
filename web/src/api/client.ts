@@ -6,35 +6,32 @@ import type {
   DataSourceResponse,
   DatasetItem,
   DatasetResponse,
+  EngineColumnInfo,
   EngineDataSourceConnection,
+  EngineExplainResult,
   EngineQueryResult,
   EngineTableInfo,
   FileUploadResponse,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-const ENGINE_BASE_URL = import.meta.env.VITE_ENGINE_BASE_URL ?? '/engine';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
-const engineApi = axios.create({
-  baseURL: ENGINE_BASE_URL,
-});
-
 export const listDataSources = async (): Promise<DataSourceResponse[]> => {
-  const response = await api.get<DataSourceResponse[]>('/api/data-sources');
+  const response = await api.get<DataSourceResponse[]>('/api/datasources');
   return response.data;
 };
 
 export const getDataSource = async (id: string): Promise<DataSourceResponse> => {
-  const response = await api.get<DataSourceResponse>(`/api/data-sources/${id}`);
+  const response = await api.get<DataSourceResponse>(`/api/datasources/${id}`);
   return response.data;
 };
 
 export const createDataSource = async (request: DataSourceRequest): Promise<DataSourceResponse> => {
-  const response = await api.post<DataSourceResponse>('/api/data-sources', request);
+  const response = await api.post<DataSourceResponse>('/api/datasources', request);
   return response.data;
 };
 
@@ -42,12 +39,12 @@ export const updateDataSource = async (
   id: string,
   request: DataSourceRequest
 ): Promise<DataSourceResponse> => {
-  const response = await api.put<DataSourceResponse>(`/api/data-sources/${id}`, request);
+  const response = await api.put<DataSourceResponse>(`/api/datasources/${id}`, request);
   return response.data;
 };
 
 export const deleteDataSource = async (id: string): Promise<void> => {
-  await api.delete(`/api/data-sources/${id}`);
+  await api.delete(`/api/datasources/${id}`);
 };
 
 export const uploadDataSourceFile = async (
@@ -62,7 +59,7 @@ export const uploadDataSourceFile = async (
     formData.append('storageDirectory', options.storageDirectory);
   }
 
-  const response = await api.post<FileUploadResponse>('/api/data-sources/upload', formData);
+  const response = await api.post<FileUploadResponse>('/api/datasources/upload', formData);
   return response.data;
 };
 
@@ -71,7 +68,7 @@ export const addFileToDataSource = async (
   request: AddDataSourceFileRequest
 ): Promise<DataSourceResponse> => {
   const response = await api.post<DataSourceResponse>(
-    `/api/data-sources/${dataSourceId}/files`,
+    `/api/datasources/${dataSourceId}/files`,
     request
   );
   return response.data;
@@ -106,13 +103,36 @@ export const listDatasets = async (): Promise<DatasetResponse[]> => {
   return response.data;
 };
 
+// The query engine is now hosted in-process by Nexova under /api/query (it is no longer a
+// separate service), so every engine call goes through the main API instance.
 export const listEngineTables = async (
   dataSource: DataSourceResponse
 ): Promise<EngineTableInfo[]> => {
-  const response = await engineApi.post<EngineTableInfo[]>('/schema/tables', {
+  const response = await api.post<EngineTableInfo[]>('/api/query/schema/tables', {
     dataSource: toEngineDataSource(dataSource),
   });
   return response.data;
+};
+
+export const listEngineColumns = async (
+  dataSource: DataSourceResponse,
+  table: string,
+  schema?: string | null
+): Promise<EngineColumnInfo[]> => {
+  const response = await api.post<EngineColumnInfo[]>('/api/query/schema/columns', {
+    dataSource: toEngineDataSource(dataSource),
+    schema,
+    table,
+  });
+  return response.data;
+};
+
+export const testEngineConnection = async (
+  dataSource: DataSourceResponse
+): Promise<void> => {
+  await api.post('/api/query/test-connection', {
+    dataSource: toEngineDataSource(dataSource),
+  });
 };
 
 export const queryEngine = async (
@@ -120,8 +140,36 @@ export const queryEngine = async (
   sql: string,
   limit = 1000
 ): Promise<EngineQueryResult> => {
-  const response = await engineApi.post<EngineQueryResult>('/query', {
+  const response = await api.post<EngineQueryResult>('/api/query', {
     dataSource: toEngineDataSource(dataSource),
+    sql,
+    limit,
+    timeoutMs: 30000,
+  });
+  return response.data;
+};
+
+export const explainEngine = async (
+  dataSource: DataSourceResponse,
+  sql: string,
+  limit = 1000
+): Promise<EngineExplainResult> => {
+  const response = await api.post<EngineExplainResult>('/api/query/explain', {
+    dataSource: toEngineDataSource(dataSource),
+    sql,
+    limit,
+    timeoutMs: 30000,
+  });
+  return response.data;
+};
+
+export const federatedQueryEngine = async (
+  dataSources: EngineDataSourceConnection[],
+  sql: string,
+  limit = 1000
+): Promise<EngineQueryResult> => {
+  const response = await api.post<EngineQueryResult>('/api/query/federated', {
+    dataSources,
     sql,
     limit,
     timeoutMs: 30000,

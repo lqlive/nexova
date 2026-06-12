@@ -6,7 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Vistora brand palette
+        // Nexova brand palette
         primary: {
           50: '#e8f6fb',
           100: '#c6e9f5',

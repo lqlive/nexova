@@ -1,0 +1,192 @@
+@host = http://localhost:5101
+@dataSourceId = 00000000-0000-0000-0000-000000000000
+@uploadedFilePath = C:/Users/neuron/source/vision/csharp/src/Nexova/storage/data-sources/example/orders_timeseries.csv
+
+### List data sources
+GET {{host}}/api/data-sources
+
+### Get data source
+GET {{host}}/api/data-sources/{{dataSourceId}}
+
+### Create PostgreSQL data source
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local PostgreSQL",
+  "type": "postgres",
+  "configuration": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "nexova",
+    "username": "postgres",
+    "password": "postgres",
+    "schema": "public"
+  }
+}
+
+### Create MySQL data source
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local MySQL",
+  "type": "mysql",
+  "configuration": {
+    "host": "localhost",
+    "port": 3306,
+    "database": "nexova",
+    "username": "root",
+    "password": "password"
+  }
+}
+
+### Create ClickHouse data source
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local ClickHouse",
+  "type": "clickhouse",
+  "configuration": {
+    "host": "localhost",
+    "port": 8123,
+    "database": "default",
+    "username": "default",
+    "password": ""
+  }
+}
+
+### Create MongoDB data source
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Local MongoDB",
+  "type": "mongodb",
+  "configuration": {
+    "connectionString": "mongodb://root:password@localhost:27017/mongo_db?authSource=admin&tls=false",
+    "database": "mongo_db"
+  }
+}
+
+### Create CSV files data source
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Sample CSV Folder",
+  "type": "files",
+  "configuration": {
+    "path": "C:/Users/neuron/source/vision/data"
+  }
+}
+
+### Create upload-backed files data source container
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Uploaded Files",
+  "type": "files",
+  "configuration": {}
+}
+
+### Upload file through the shared upload endpoint
+POST {{host}}/api/data-sources/upload
+Content-Type: multipart/form-data; boundary=NexovaBoundary
+
+--NexovaBoundary
+Content-Disposition: form-data; name="file"; filename="orders_timeseries.csv"
+Content-Type: text/csv
+
+< C:/Users/neuron/source/vision/data/orders_timeseries.csv
+--NexovaBoundary
+Content-Disposition: form-data; name="storageDirectory"
+
+{{dataSourceStoragePath}}
+--NexovaBoundary--
+
+### Register uploaded file on existing files data source
+POST {{host}}/api/data-sources/{{dataSourceId}}/files
+Content-Type: application/json
+
+{
+  "fileName": "orders_timeseries.csv",
+  "contentType": "text/csv",
+  "size": 12345,
+  "storagePath": "copy from upload response storagePath",
+  "path": "copy from upload response path",
+  "hasHeader": true,
+  "delimiter": ",",
+  "sheet": null
+}
+
+### Upload another file through the shared upload endpoint
+POST {{host}}/api/data-sources/upload
+Content-Type: multipart/form-data; boundary=NexovaBoundary
+
+--NexovaBoundary
+Content-Disposition: form-data; name="file"; filename="customers.csv"
+Content-Type: text/csv
+
+< C:/Users/neuron/source/vision/data/customers.csv
+--NexovaBoundary
+Content-Disposition: form-data; name="storageDirectory"
+
+{{dataSourceStoragePath}}
+--NexovaBoundary--
+
+### Register another uploaded file on existing files data source
+POST {{host}}/api/data-sources/{{dataSourceId}}/files
+Content-Type: application/json
+
+{
+  "fileName": "customers.csv",
+  "contentType": "text/csv",
+  "size": 12345,
+  "storagePath": "copy from upload response storagePath",
+  "path": "copy from upload response path",
+  "hasHeader": true,
+  "delimiter": ",",
+  "sheet": null
+}
+
+### Upload standalone file
+POST {{host}}/api/data-sources/upload
+Content-Type: multipart/form-data; boundary=NexovaBoundary
+
+--NexovaBoundary
+Content-Disposition: form-data; name="file"; filename="orders_timeseries.csv"
+Content-Type: text/csv
+
+< C:/Users/neuron/source/vision/data/orders_timeseries.csv
+--NexovaBoundary--
+
+### Create uploaded file data source
+POST {{host}}/api/data-sources
+Content-Type: application/json
+
+{
+  "name": "Uploaded Orders",
+  "type": "files",
+  "configuration": {
+    "path": "{{uploadedFilePath}}",
+    "storagePath": "copy from upload response storagePath"
+  }
+}
+
+### Update data source
+PUT {{host}}/api/data-sources/{{dataSourceId}}
+Content-Type: application/json
+
+{
+  "name": "Sample CSV Folder Updated",
+  "type": "files",
+  "configuration": {
+    "path": "C:/Users/neuron/source/vision/data"
+  }
+}
+
+### Delete data source
+DELETE {{host}}/api/data-sources/{{dataSourceId}}

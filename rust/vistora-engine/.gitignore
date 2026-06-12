@@ -1,4 +1,0 @@
-/target
-
-# Local S3 credentials (contains secrets, never commit)
-s3.config.json

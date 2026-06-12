@@ -1,7 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Vistora.Core/Vistora.Core.csproj" />
-    <Project Path="src/Vistora.Database.PostgreSQL/Vistora.Database.PostgreSQL.csproj" />
-    <Project Path="src/Vistora/Vistora.csproj" />
-  </Folder>
-</Solution>

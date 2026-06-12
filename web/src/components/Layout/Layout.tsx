@@ -98,7 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <ChartBarIcon className="h-4 w-4 text-white" />
           </div>
           {!collapsed && (
-            <span className="text-base font-semibold text-gray-900 tracking-tight">Vistora</span>
+            <span className="text-base font-semibold text-gray-900 tracking-tight">Nexova</span>
           )}
         </div>
 

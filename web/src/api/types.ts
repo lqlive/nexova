@@ -161,6 +161,13 @@ export interface DatasetResponse {
 
 export interface EngineDataSourceConnection extends DataSourceConfiguration {
   type: string;
+  // Logical table exposed to SQL (single source) and its federated alias.
+  table?: string | null;
+  alias?: string | null;
+  // File source options.
+  hasHeader?: boolean | null;
+  delimiter?: string | null;
+  sheet?: string | null;
 }
 
 export interface EngineTableInfo {
@@ -181,5 +188,17 @@ export interface EngineQueryResult {
   columns: EngineColumnInfo[];
   rows: unknown[][];
   rowCount: number;
+  durationMs: number;
+}
+
+export interface EngineExplainPlanInfo {
+  planType: string;
+  plan: string;
+}
+
+export interface EngineExplainResult {
+  logicalPlan?: string | null;
+  physicalPlan?: string | null;
+  plans: EngineExplainPlanInfo[];
   durationMs: number;
 }

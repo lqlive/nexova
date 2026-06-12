@@ -50,7 +50,7 @@ const Login: React.FC = () => {
   const loginConfig: LoginConfig = {
     enableEmailLogin: true,
     enableProviders: ['github', 'microsoft', 'google'], // Configurable enabled providers
-    appName: 'Vistora',
+    appName: 'Nexova',
   };
 
   const allProviders: LoginProvider[] = [
